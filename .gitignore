@@ -1,0 +1,6 @@
+config.json
+data/
+*.log
+__pycache__/
+.DS_Store
+docs/.archive.tmp

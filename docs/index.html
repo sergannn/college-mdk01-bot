@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Архив · Мобильная разработка</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="top"><a class="brand" href="./"><span class="mark">м</span><span>Колледж <b>/ Архив</b></span></a><span class="top-note">Мобильная разработка</span><button id="lock" class="quiet" hidden>Закрыть архив</button></header>
+  <main>
+    <section id="gate" class="gate">
+      <div class="eyebrow">ГРУППЫ 1092 И 1094</div><h1>Вся переписка.<br><span>В одном месте.</span></h1>
+      <p class="intro">История обсуждений, задания и сообщения учебных групп. Поиск по тексту, авторам и датам.</p>
+      <form id="unlock-form"><label for="password">Пароль доступа</label><div class="unlock-row"><input id="password" type="password" autocomplete="current-password" required placeholder="Введите пароль"><button id="unlock" type="submit">Открыть архив <span aria-hidden="true">↗</span></button></div><p id="error" class="error" role="alert"></p></form>
+      <div class="privacy"><span class="privacy-icon" aria-hidden="true">⌑</span><p>Переписка зашифрована. Пароль проверяется в вашем браузере и никуда не отправляется.</p></div>
+    </section>
+    <div id="archive" hidden>
+      <section class="heading"><div><div class="eyebrow">УЧЕБНЫЕ ГРУППЫ / TELEGRAM</div><h1>Архив обсуждений<span class="dot">.</span></h1><p id="updated" class="muted"></p></div><button id="download" class="secondary">Скачать выборку CSV ↓</button></section>
+      <section class="stats" aria-label="Статистика архива"><div><span>СООБЩЕНИЙ</span><strong id="total">—</strong><small id="period"></small></div><div><span>УЧАСТНИКОВ С СООБЩЕНИЯМИ</span><strong id="people">—</strong><small>по всем группам</small></div><div><span>УЧЕБНЫХ ГРУПП</span><strong id="groups-count">—</strong><small>единая история до и после миграции</small></div><div><span>С ВЛОЖЕНИЯМИ</span><strong id="media-count">—</strong><small>сведения о файлах</small></div></section>
+      <section class="activity"><div><h2>Ритм обсуждений</h2><span id="activity-range" class="muted"></span></div><div id="chart" class="chart" role="img" aria-label="Активность за последние 30 дней архива"></div></section>
+      <section class="workspace">
+        <aside><div class="eyebrow">ГРУППЫ</div><nav id="group-tabs" aria-label="Выбор группы"></nav><div class="aside-note">Новые сообщения собирает бот. Эта страница показывает снимок базы на указанную дату.</div></aside>
+        <div class="feed">
+          <div class="search-wrap"><span aria-hidden="true">⌕</span><input id="search" type="search" aria-label="Поиск по сообщениям и авторам" placeholder="Найти сообщение, ссылку или автора…"></div>
+          <div class="filters"><select id="author" aria-label="Автор"><option value="">Все авторы</option></select><label>С <input id="from" type="date" aria-label="Начальная дата"></label><label>По <input id="to" type="date" aria-label="Конечная дата"></label><select id="kind" aria-label="Тип сообщений"><option value="all">Все сообщения</option><option value="media">С вложениями</option><option value="text">С текстом</option></select><label class="check"><input id="service" type="checkbox">Служебные</label><button id="reset" class="quiet">Сбросить</button></div>
+          <div class="results-top"><span id="result-count" aria-live="polite"></span><select id="order" aria-label="Порядок"><option value="desc">Сначала новые</option><option value="asc">Сначала старые</option></select></div>
+          <div id="messages"></div><div id="empty" class="empty" hidden><h2>Ничего не нашлось</h2><p>Попробуйте другой запрос или уберите часть фильтров.</p></div>
+          <div class="pagination"><button id="previous" class="secondary">← Назад</button><span id="page-number"></span><button id="next" class="secondary">Далее →</button></div>
+        </div>
+      </section>
+      <footer><span>Архив учебных групп · 1092 / 1094</span><span>Фото, видео и документы представлены метаданными. Файлы не загружены.</span></footer>
+    </div>
+  </main>
+</body>
+</html>
