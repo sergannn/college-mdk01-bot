@@ -68,7 +68,7 @@ $('unlock-form').addEventListener('submit', async event => {
     try { data=await decrypt(envelope,$('password').value); }
     catch { throw new Error('Не удалось открыть архив. Проверьте пароль и целостность файла.'); }
     $('password').value=''; $('gate').hidden=true; $('archive').hidden=false; $('lock').hidden=false;
-    initialize(); $('search').focus();
+    initialize();
   } catch(error) { $('error').textContent=error.message; }
   finally { $('unlock').disabled=false; $('unlock').textContent='Открыть архив ↗'; }
 });
@@ -82,24 +82,23 @@ function initialize() {
   const dates=data.messages.map(m=>m.date).filter(Number.isFinite);
   $('period').textContent=dates.length ? `${dateFormat.format(new Date(Math.min(...dates)*1000))} — ${dateFormat.format(new Date(Math.max(...dates)*1000))}` : 'Нет сообщений';
   $('updated').textContent=`Снимок базы: ${timeFormat.format(new Date(data.generatedAt))} · московское время`;
-  const authors=new Map(); ordinary.forEach(m=>authors.set(m.authorKey,m.author));
-  $('author').replaceChildren(node('option','','Все авторы')); $('author').firstChild.value='';
-  [...authors].sort((a,b)=>a[1].localeCompare(b[1],'ru')).forEach(([id,name])=>{const option=node('option','',name);option.value=id;$('author').append(option);});
-  drawCourse(); group=''; page=0; drawGroups(); drawChart(); render();
+  group=data.groups[0]?.id||''; drawGroups(); drawCourse();
 }
 
 function drawCourse() {
   const course=data.courseAnalysis;
   if(!course){$('course').hidden=true;return;}
   $('course').hidden=false; $('course-title').textContent=course.title;
+  const selected=data.groups.find(g=>g.id===group); const selectedTitle=selected?.title||'';
   $('course-method').textContent=`${course.teacher}. ${course.method}`;
-  const c=course.coverage; $('course-coverage').textContent=`${c.firstTeacherMessage} — ${c.lastTeacherMessage} · ${nf.format(c.teacherMessages)} сообщений преподавателя`;
+  const c=course.coverage; $('course-coverage').textContent=`${selectedTitle} · ${c.firstTeacherMessage} — ${c.lastTeacherMessage}`;
   const box=$('course-subjects'); box.replaceChildren();
   course.subjects.forEach(subject=>{
+    const modules=subject.modules.filter(mod=>mod.groups?.includes(selectedTitle));
+    if(!modules.length)return;
     const article=node('article','course-subject');
     article.append(node('div','course-subject-title',subject.title),node('p','course-outcome',subject.outcome));
-    const groups=node('div','course-groups'); subject.groups.forEach(g=>groups.append(node('span','tag',g))); article.append(groups);
-    const timeline=node('div','course-timeline'); subject.modules.forEach(mod=>{
+    const timeline=node('div','course-timeline'); modules.forEach(mod=>{
       const item=node('div','course-module'); item.append(node('time','course-date',mod.dates),node('h3','',mod.title));
       const list=node('ul'); mod.topics.forEach(t=>list.append(node('li','',t))); item.append(list); timeline.append(item);
     }); article.append(timeline); box.append(article);
@@ -109,11 +108,10 @@ function drawCourse() {
 
 function drawGroups() {
   $('group-tabs').replaceChildren();
-  [{id:'',title:'Все группы'},...data.groups].forEach(g=>{
-    const count=data.messages.filter(m=>!m.service && (!g.id || m.group===g.id)).length;
+  data.groups.forEach(g=>{
     const button=node('button','group-tab'+(group===g.id?' active':''),g.title);
-    button.setAttribute('aria-pressed',String(group===g.id)); button.append(node('span','',`${nf.format(count)} сообщений`));
-    button.onclick=()=>{group=g.id;page=0;drawGroups();render();}; $('group-tabs').append(button);
+    button.setAttribute('aria-pressed',String(group===g.id));
+    button.onclick=()=>{group=g.id;drawGroups();drawCourse();}; $('group-tabs').append(button);
   });
 }
 
@@ -164,14 +162,4 @@ function render() {
   $('page-number').textContent=`${page+1} / ${pages}`;$('previous').disabled=page===0;$('next').disabled=page===pages-1;
 }
 
-['search','author','from','to','kind','service','order'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',()=>{if(data){page=0;render();}}));
-$('reset').onclick=()=>{['search','author','from','to'].forEach(id=>$(id).value='');$('kind').value='all';$('service').checked=false;page=0;render();};
-$('previous').onclick=()=>{page--;render();$('result-count').scrollIntoView({block:'start',behavior:'smooth'});};
-$('next').onclick=()=>{page++;render();$('result-count').scrollIntoView({block:'start',behavior:'smooth'});};
-$('lock').onclick=()=>{clearImages();archiveKey=null;data=null;filtered=[];$('messages').replaceChildren();$('group-tabs').replaceChildren();$('author').replaceChildren();$('search').value='';$('archive').hidden=true;$('gate').hidden=false;$('lock').hidden=true;$('password').focus();};
-$('download').onclick=()=>{
-  const cell=value=>'"'+String(value??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';
-  const rows=[['Дата (Москва)','Группа','Автор','Текст','Вложения','Источник'],...filtered.map(m=>[timeFormat.format(new Date(m.date*1000)),data.groups.find(g=>g.id===m.group)?.title,m.author,m.text,m.media.join(', '),m.source])];
-  const url=URL.createObjectURL(new Blob(['\uFEFF'+rows.map(r=>r.map(cell).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
-  const link=node('a');link.href=url;link.download='telegram-archive.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-};
+$('lock').onclick=()=>{clearImages();archiveKey=null;data=null;filtered=[];$('group-tabs').replaceChildren();$('course-subjects').replaceChildren();$('archive').hidden=true;$('gate').hidden=false;$('lock').hidden=true;$('password').focus();};
