@@ -59,23 +59,7 @@ function photoView(asset) {
   figure.loadPhoto=load; imageObserver.observe(figure);return figure;
 }
 
-$('unlock-form').addEventListener('submit', async event => {
-  event.preventDefault(); $('error').textContent=''; $('unlock').disabled=true; $('unlock').textContent='Открываем…';
-  try {
-    let envelope;
-    try { const response=await fetch('archive.enc.json',{cache:'no-store'}); if(!response.ok)throw new Error(); envelope=await response.json(); }
-    catch { throw new Error('Не удалось загрузить архив. Проверьте интернет и попробуйте ещё раз.'); }
-    try { data=await decrypt(envelope,$('password').value); }
-    catch { throw new Error('Не удалось открыть архив. Проверьте пароль и целостность файла.'); }
-    $('password').value=''; $('gate').hidden=true; $('archive').hidden=false; $('lock').hidden=false;
-    initialize();
-  } catch(error) { $('error').textContent=error.message; }
-  finally { $('unlock').disabled=false; $('unlock').textContent='Открыть архив ↗'; }
-});
-
 function initialize() {
-  const ordinary=data.messages.filter(m=>!m.service);
-  const dates=data.messages.map(m=>m.date).filter(Number.isFinite);
   $('updated').textContent=`Снимок базы: ${timeFormat.format(new Date(data.generatedAt))} · московское время`;
   group=data.groups[0]?.id||''; drawGroups(); drawCourse();
 }
@@ -161,4 +145,7 @@ function render() {
   $('page-number').textContent=`${page+1} / ${pages}`;$('previous').disabled=page===0;$('next').disabled=page===pages-1;
 }
 
-$('lock').onclick=()=>{clearImages();archiveKey=null;data=null;filtered=[];$('group-tabs').replaceChildren();$('course-subjects').replaceChildren();$('archive').hidden=true;$('gate').hidden=false;$('lock').hidden=true;$('password').focus();};
+fetch('archive.json',{cache:'no-store'})
+  .then(response=>{if(!response.ok)throw new Error('Не удалось загрузить программу');return response.json();})
+  .then(snapshot=>{data=snapshot;initialize();})
+  .catch(error=>{$('course-title').textContent='Не удалось загрузить программу';$('course-method').textContent=error.message;});

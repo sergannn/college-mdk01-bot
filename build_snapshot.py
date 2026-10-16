@@ -115,12 +115,18 @@ def main():
     tmp = docs / '.archive.tmp'
     tmp.write_text(result.stdout + '\n')
     tmp.replace(docs / 'archive.enc.json')
+    public_snapshot = {
+        'generatedAt': data['generatedAt'],
+        'courseAnalysis': data['courseAnalysis'],
+        'groups': data['groups'],
+    }
+    (docs / 'archive.json').write_text(json.dumps(public_snapshot, ensure_ascii=False, separators=(',', ':')) + '\n')
     for old in (docs / 'media').glob('*.bin'):
         if not old.name.endswith('-' + media_version + '.bin'):
             old.unlink()
     print(f'Encrypted snapshot: {len(data["messages"])} records, {len(data["groups"])} groups')
     print(f'Encrypted image files: {len(assets)}')
-    print(f'Password is stored only at {password_path}')
+    print('Public course snapshot written without raw messages or credentials')
 
 
 if __name__ == '__main__':
