@@ -101,7 +101,10 @@ function drawCourse() {
     const timeline=node('div','course-timeline'); modules.forEach(mod=>{
       const item=node('div','course-module'); item.append(node('time','course-date',mod.dates),node('h3','',mod.title));
       const list=node('ul'); mod.topics.forEach(t=>list.append(node('li','',t))); item.append(list); timeline.append(item);
+      if(mod.practice)item.append(node('p','course-detail',`Практика: ${mod.practice}`));
+      if(mod.evidence)item.append(node('p','course-evidence',`Основание в переписке: ${mod.evidence}`));
     }); article.append(timeline); box.append(article);
+    if(subject.visuals?.length){const details=document.createElement('details');details.className='visual-analysis';details.open=true;details.append(node('summary','','Что подтверждают скриншоты'));const list=node('ul');subject.visuals.forEach(v=>list.append(node('li','',v)));details.append(list);article.append(details);}
   });
   $('assessment-items').replaceChildren(); course.assessment.forEach(item=>$('assessment-items').append(node('span','assessment-item',item)));
 }
