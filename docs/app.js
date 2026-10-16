@@ -1,6 +1,8 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let data = null, group = '', page = 0, filtered = [];
+let archiveKey = null, imageObserver = null, imageController = new AbortController(), mediaGeneration = 0;
+const objectURLs = new Set();
 const PAGE_SIZE = 40;
 const nf = new Intl.NumberFormat('ru-RU');
 const dateFormat = new Intl.DateTimeFormat('ru-RU', {day:'2-digit',month:'short',year:'numeric',timeZone:'Europe/Moscow'});
@@ -15,7 +17,46 @@ async function decrypt(envelope, password) {
   const material = await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveKey']);
   const key = await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(envelope.salt),iterations:envelope.iterations,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['decrypt']);
   const plain = await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(envelope.iv)},key,b64(envelope.ciphertext));
-  return JSON.parse(new TextDecoder().decode(plain));
+  const decoded = JSON.parse(new TextDecoder().decode(plain));
+  archiveKey = key;
+  return decoded;
+}
+
+function clearImages() {
+  mediaGeneration++; imageObserver?.disconnect(); imageController.abort(); imageController=new AbortController();
+  objectURLs.forEach(url=>URL.revokeObjectURL(url)); objectURLs.clear();
+}
+
+function photoView(asset) {
+  const figure=node('figure','photo-view');
+  figure.dataset.mime=asset.mime;
+  const status=node('figcaption','photo-status','Загружаем фотографию…');figure.append(status);
+  const generation=mediaGeneration, signal=imageController.signal, key=archiveKey;
+  const load=async()=>{
+    try {
+      if(!/^media\/[a-f0-9]{64}-[a-f0-9]{16}\.bin$/.test(asset.path))throw new Error('Invalid asset');
+      const response=await fetch(asset.path,{cache:'no-store',signal});if(!response.ok)throw new Error('Image unavailable');
+      const bytes=new Uint8Array(await response.arrayBuffer());
+      const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:bytes.slice(0,12)},key,bytes.slice(12));
+      if(generation!==mediaGeneration || signal.aborted)return;
+      const url=URL.createObjectURL(new Blob([plain],{type:asset.mime}));objectURLs.add(url);
+      const link=node('a');link.href=url;link.target='_blank';link.rel='noopener';
+      if(asset.mime.startsWith('image/')) {
+        link.setAttribute('aria-label','Открыть изображение в полном размере');
+        const image=node('img');image.alt='Изображение из сообщения';image.src=url;image.decoding='async';
+        link.append(image);figure.replaceChildren(link,node('figcaption','photo-status','Открыть в полном размере ↗'));
+      } else if(asset.mime==='video/webm') {
+        const video=node('video');video.controls=true;video.loop=true;video.muted=true;video.playsInline=true;video.src=url;
+        figure.replaceChildren(video,node('figcaption','photo-status','Анимированный стикер'));
+      } else {
+        link.download='sticker.tgs';link.textContent='Скачать анимированный стикер ↓';link.className='sticker-download';
+        figure.replaceChildren(link);
+      }
+    } catch(error) {
+      if(generation===mediaGeneration && error.name!=='AbortError')status.textContent='Не удалось загрузить фото. Обновите страницу и попробуйте снова.';
+    }
+  };
+  figure.loadPhoto=load; imageObserver.observe(figure);return figure;
 }
 
 $('unlock-form').addEventListener('submit', async event => {
@@ -75,6 +116,10 @@ const serviceNames={invite_members:'Добавлены участники',join_
   migrate_from_group:'Создана супергруппа',create_group:'Создана группа'};
 
 function render() {
+  clearImages();
+  imageObserver=new IntersectionObserver(entries=>entries.forEach(entry=>{
+    if(entry.isIntersecting){imageObserver.unobserve(entry.target);entry.target.loadPhoto();}
+  }),{rootMargin:'600px'});
   const query=$('search').value.trim().toLocaleLowerCase('ru');
   const author=$('author').value, from=$('from').value, to=$('to').value, kind=$('kind').value;
   filtered=data.messages.filter(m=>{
@@ -93,7 +138,8 @@ function render() {
     const time=node('time','',timeFormat.format(new Date(m.date*1000)));time.dateTime=new Date(m.date*1000).toISOString();head.append(authorBox,time);card.append(head);
     const text=m.text || (m.service?(serviceNames[m.action]||'Служебное событие'):m.media.length?'':'Сообщение без текста');
     if(text)card.append(node('p','message-text',text));
-    if(m.media.length){const tags=node('div','media-tags');m.media.forEach(t=>tags.append(node('span','tag',t+' · метаданные')));card.append(tags);}
+    if(m.images?.length)m.images.forEach(asset=>card.append(photoView(asset)));
+    if(m.media.length){const tags=node('div','media-tags');m.media.forEach(t=>tags.append(node('span','tag',t+(m.images?.length?'':' · метаданные'))));card.append(tags);}
     $('messages').append(card);
   });
   $('page-number').textContent=`${page+1} / ${pages}`;$('previous').disabled=page===0;$('next').disabled=page===pages-1;
@@ -103,7 +149,7 @@ function render() {
 $('reset').onclick=()=>{['search','author','from','to'].forEach(id=>$(id).value='');$('kind').value='all';$('service').checked=false;page=0;render();};
 $('previous').onclick=()=>{page--;render();$('result-count').scrollIntoView({block:'start',behavior:'smooth'});};
 $('next').onclick=()=>{page++;render();$('result-count').scrollIntoView({block:'start',behavior:'smooth'});};
-$('lock').onclick=()=>{data=null;filtered=[];$('messages').replaceChildren();$('group-tabs').replaceChildren();$('author').replaceChildren();$('search').value='';$('archive').hidden=true;$('gate').hidden=false;$('lock').hidden=true;$('password').focus();};
+$('lock').onclick=()=>{clearImages();archiveKey=null;data=null;filtered=[];$('messages').replaceChildren();$('group-tabs').replaceChildren();$('author').replaceChildren();$('search').value='';$('archive').hidden=true;$('gate').hidden=false;$('lock').hidden=true;$('password').focus();};
 $('download').onclick=()=>{
   const cell=value=>'"'+String(value??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';
   const rows=[['Дата (Москва)','Группа','Автор','Текст','Вложения','Источник'],...filtered.map(m=>[timeFormat.format(new Date(m.date*1000)),data.groups.find(g=>g.id===m.group)?.title,m.author,m.text,m.media.join(', '),m.source])];

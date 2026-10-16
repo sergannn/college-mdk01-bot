@@ -71,6 +71,16 @@ class ImportTests(unittest.TestCase):
             prepare(self.db, self.chat, -123)
         self.assertEqual(self.db.execute('SELECT count(*) FROM messages').fetchone()[0], 0)
 
+    def test_pre_migration_history_without_known_old_group(self):
+        with self.db:
+            self.db.execute("INSERT INTO chats(chat_id,type) VALUES(-1000000000456,'supergroup')")
+        self.chat['id'] = 456
+        self.chat['type'] = 'private_supergroup'
+        self.chat['messages'][0]['id'] = -999000001
+        rows = prepare(self.db, self.chat, -1000000000456)
+        self.assertEqual(rows[0][0], -1000000000456)
+        self.assertEqual(apply(self.db, rows, 'digest'), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

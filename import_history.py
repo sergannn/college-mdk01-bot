@@ -10,6 +10,7 @@ from pathlib import Path
 import sqlite3
 
 from bot import ROOT, connect
+from media_store import import_photos
 
 
 def flatten(value):
@@ -52,9 +53,10 @@ def prepare(db, chat, chat_id):
         ids.add(exported_id)
         target_chat_id = chat_id
         if exported_id < 0:
-            if len(old_chat_ids) != 1:
+            if len(old_chat_ids) > 1:
                 raise ValueError('Migrated history requires an unambiguous source group recorded by the bot')
-            target_chat_id = next(iter(old_chat_ids))
+            if old_chat_ids:
+                target_chat_id = next(iter(old_chat_ids))
         # Basic-group message IDs belong to each account, not to the chat.
         # Keep imported IDs negative, outside the positive Bot API namespace.
         basic = chat.get('type') in ('private_group', 'public_group') or exported_id < 0
@@ -87,12 +89,27 @@ def resolve(db, records):
                 mid = matches[0][0]
         elif mid < 0:
             original = json.loads(payload)['message']
-            if original.get('action') == 'migrate_to_supergroup':
+            service_fields = {'migrate_to_supergroup': 'migrate_to_chat_id',
+                              'migrate_from_group': 'migrate_from_chat_id',
+                              'invite_members': 'new_chat_members', 'remove_members': 'left_chat_member',
+                              'edit_group_title': 'new_chat_title', 'edit_group_photo': 'new_chat_photo',
+                              'pin_message': 'pinned_message'}
+            field = service_fields.get(original.get('action'))
+            if field:
                 matches = [(m, p) for m, p in db.execute('''SELECT message_id,payload FROM messages
                     WHERE chat_id=? AND sender_id IS ? AND sent_at=? AND last_update_id>=0''',
-                    (cid, sender, sent)) if json.loads(p).get('migrate_to_chat_id')]
+                    (cid, sender, sent)) if json.loads(p).get(field)]
                 if len(matches) == 1:
                     mid = matches[0][0]
+            elif original.get('photo') and sender is not None:
+                matches = []
+                for candidate, value in db.execute('''SELECT message_id,payload FROM messages
+                    WHERE chat_id=? AND sender_id=? AND sent_at=? AND last_update_id>=0''', (cid, sender, sent)):
+                    photos = json.loads(value).get('photo', [])
+                    if photos and photos[-1].get('file_size') == original.get('photo_file_size'):
+                        matches.append(candidate)
+                if len(matches) == 1:
+                    mid = matches[0]
         resolved.append((cid, mid, sender, name, sender_chat, sent, edited, text, reply, payload))
     return resolved
 
@@ -146,7 +163,9 @@ def main():
         db.close()
         db = connect(path)
         inserted = apply(db, records, hashlib.sha256(raw).hexdigest())
+        photos = import_photos(db, resolve(db, records), args.export.parent, ROOT / 'data/media')
         print(f'Imported: {inserted}; preserved existing: {len(records)-inserted}')
+        print(f'Images and stickers archived: {photos["available"]}; unavailable in export: {photos["missing"]}')
         print(f'Backup: {backup_path}')
     except (ValueError, KeyError, TypeError, OSError, sqlite3.Error) as error:
         parser.exit(1, f'Import failed: {error}\n')
