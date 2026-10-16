@@ -7,6 +7,7 @@ from pathlib import Path
 import secrets
 import sqlite3
 import subprocess
+from course_analysis import build as build_course_analysis
 
 ROOT = Path(__file__).resolve().parent
 
@@ -62,6 +63,7 @@ def snapshot(db):
                          'service': bool(service), 'action': raw.get('action') if service else None,
                          'source': 'История' if imported else 'Бот'})
     return {'generatedAt': datetime.now(timezone.utc).isoformat(),
+            'courseAnalysis': build_course_analysis(db),
             'groups': sorted(groups.values(), key=lambda x:x['title']), 'messages': messages}
 
 

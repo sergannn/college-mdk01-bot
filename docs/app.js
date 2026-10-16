@@ -85,7 +85,26 @@ function initialize() {
   const authors=new Map(); ordinary.forEach(m=>authors.set(m.authorKey,m.author));
   $('author').replaceChildren(node('option','','Все авторы')); $('author').firstChild.value='';
   [...authors].sort((a,b)=>a[1].localeCompare(b[1],'ru')).forEach(([id,name])=>{const option=node('option','',name);option.value=id;$('author').append(option);});
-  group=''; page=0; drawGroups(); drawChart(); render();
+  drawCourse(); group=''; page=0; drawGroups(); drawChart(); render();
+}
+
+function drawCourse() {
+  const course=data.courseAnalysis;
+  if(!course){$('course').hidden=true;return;}
+  $('course').hidden=false; $('course-title').textContent=course.title;
+  $('course-method').textContent=`${course.teacher}. ${course.method}`;
+  const c=course.coverage; $('course-coverage').textContent=`${c.firstTeacherMessage} — ${c.lastTeacherMessage} · ${nf.format(c.teacherMessages)} сообщений преподавателя`;
+  const box=$('course-subjects'); box.replaceChildren();
+  course.subjects.forEach(subject=>{
+    const article=node('article','course-subject');
+    article.append(node('div','course-subject-title',subject.title),node('p','course-outcome',subject.outcome));
+    const groups=node('div','course-groups'); subject.groups.forEach(g=>groups.append(node('span','tag',g))); article.append(groups);
+    const timeline=node('div','course-timeline'); subject.modules.forEach(mod=>{
+      const item=node('div','course-module'); item.append(node('time','course-date',mod.dates),node('h3','',mod.title));
+      const list=node('ul'); mod.topics.forEach(t=>list.append(node('li','',t))); item.append(list); timeline.append(item);
+    }); article.append(timeline); box.append(article);
+  });
+  $('assessment-items').replaceChildren(); course.assessment.forEach(item=>$('assessment-items').append(node('span','assessment-item',item)));
 }
 
 function drawGroups() {
