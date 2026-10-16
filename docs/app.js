@@ -75,12 +75,7 @@ $('unlock-form').addEventListener('submit', async event => {
 
 function initialize() {
   const ordinary=data.messages.filter(m=>!m.service);
-  $('total').textContent=nf.format(ordinary.length);
-  $('people').textContent=nf.format(new Set(ordinary.map(m=>m.authorKey)).size);
-  $('groups-count').textContent=data.groups.length;
-  $('media-count').textContent=nf.format(ordinary.filter(m=>m.media.length).length);
   const dates=data.messages.map(m=>m.date).filter(Number.isFinite);
-  $('period').textContent=dates.length ? `${dateFormat.format(new Date(Math.min(...dates)*1000))} — ${dateFormat.format(new Date(Math.max(...dates)*1000))}` : 'Нет сообщений';
   $('updated').textContent=`Снимок базы: ${timeFormat.format(new Date(data.generatedAt))} · московское время`;
   group=data.groups[0]?.id||''; drawGroups(); drawCourse();
 }
@@ -90,8 +85,9 @@ function drawCourse() {
   if(!course){$('course').hidden=true;return;}
   $('course').hidden=false; $('course-title').textContent=course.title;
   const selected=data.groups.find(g=>g.id===group); const selectedTitle=selected?.title||'';
+  $('course-title').textContent=selectedTitle || 'Программа группы';
   $('course-method').textContent=`${course.teacher}. ${course.method}`;
-  const c=course.coverage; $('course-coverage').textContent=`${selectedTitle} · ${c.firstTeacherMessage} — ${c.lastTeacherMessage}`;
+  const c=course.coverage; $('course-coverage').textContent=`Даты занятий: ${c.firstTeacherMessage} — ${c.lastTeacherMessage}`;
   const box=$('course-subjects'); box.replaceChildren();
   course.subjects.forEach(subject=>{
     const modules=subject.modules.filter(mod=>mod.groups?.includes(selectedTitle));
